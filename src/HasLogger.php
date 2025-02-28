@@ -60,12 +60,19 @@ trait HasLogger
             return implode(';', $value);
         }, $pendingRequest->createPsrRequest()->getHeaders());
 
+        $cookies = $pendingRequest->config()->get('cookies');
+        
+        if($cookies instanceof \GuzzleHttp\Cookie\CookieJarInterface) {
+            $cookies = $cookies->toArray();
+        }
+        
         $this->getLogger()?->info("{$requestClass} Request:", [
             'connector' => $pendingRequest->getConnector()::class,
             'request' => $requestClass,
             'method'  => $pendingRequest->getMethod(),
             'uri'     => (string)$pendingRequest->getUri(),
             'headers' => $headers,
+            'cookies' => $cookies,
             'config' => $pendingRequest->config()->all(),
             'body'    => (string)$pendingRequest->body(),
         ]);
