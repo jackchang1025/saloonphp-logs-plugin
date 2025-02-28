@@ -1,6 +1,7 @@
 <?php
 
-namespace Weijiajia\SaloonphpLogsPlugin\Traits;
+namespace Weijiajia\SaloonphpLogsPlugin;
+
 use Psr\Log\LoggerInterface;
 use Saloon\Http\PendingRequest;
 use Saloon\Http\Response;
