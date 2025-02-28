@@ -1,6 +1,9 @@
 {
     "name": "weijiajia/saloonphp-logs-plugin",
     "type": "library",
+    "description": "SaloonPHP Logs Plugin",
+    "license": "MIT",
+    "keywords": ["saloonphp", "logs", "plugin"],
     "autoload": {
         "psr-4": {
             "Weijiajia\\SaloonphpLogsPlugin\\": "src/"
