@@ -56,11 +56,9 @@ trait HasLogger
         $requestClass = $pendingRequest->getRequest()::class;
 
 
-        $headers = [];
-
-        foreach ($pendingRequest->getPsrRequest()->getHeaders() as $headerName => $value) {
-            $headers[$headerName] = implode(';', $value);
-        }
+        $headers = array_map(function ($value) {
+            return implode(';', $value);
+        }, $pendingRequest->createPsrRequest()->getHeaders());
 
         $this->getLogger()?->info("{$requestClass} Request:", [
             'connector' => $pendingRequest->getConnector()::class,
@@ -79,11 +77,9 @@ trait HasLogger
     {
         $requestClass = $response->getRequest()::class;
 
-        $headers = [];
-
-        foreach ($response->getPsrResponse()->getHeaders() as $headerName => $value) {
-            $headers[$headerName] = implode(';', $value);
-        }
+        $headers = array_map(function ($value) {
+            return implode(';', $value);
+        }, $response->getPsrResponse()->getHeaders());
 
         $this->getLogger()?->info("{$requestClass} Response:", [
             'status'  => $response->status(),
