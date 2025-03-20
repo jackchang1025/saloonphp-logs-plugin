@@ -4,14 +4,16 @@ namespace Weijiajia\SaloonphpLogsPlugin;
 
 use Psr\Log\LoggerInterface;
 use Saloon\Http\PendingRequest;
-use Saloon\Http\Response;
-use Saloon\Enums\PipeOrder;
-
+use Saloon\Http\Senders\GuzzleSender;
+use GuzzleHttp\MessageFormatter;
+use GuzzleHttp\Exception\RequestException;
+use Psr\Http\Message\RequestInterface;
+use Weijiajia\SaloonphpLogsPlugin\Contracts\HasLoggerInterface;
 trait HasLogger
 {
-    protected bool $isLog = false;
-
     protected ?LoggerInterface $logger = null;
+
+    protected ?MessageFormatter $messageFormatter = null;
 
     public function withLogger(?LoggerInterface $logger = null): static
     {
@@ -25,75 +27,60 @@ trait HasLogger
         return $this->logger;
     }
 
+    public function getMessageFormatter(): MessageFormatter
+    {
+        return $this->messageFormatter ??= new MessageFormatter("\n{uri}\n{request}\n----------\n{response}\n");
+    }
+
+    public function withMessageFormatter(MessageFormatter $messageFormatter): static
+    {
+        $this->messageFormatter = $messageFormatter;
+
+        return $this;
+    }
+
     public function bootHasLogger(PendingRequest $pendingRequest): void
     {
-        if ($this->isLog) {
-            return;
+        $connector = $pendingRequest->getConnector();
+        $request = $pendingRequest->getRequest();
+        
+        $sender = $connector->sender();
+        if(!$sender instanceof GuzzleSender) {
+            throw new HasLoggerException('The sender must be an instance of GuzzleSender to use the HasLogger plugin');
         }
 
-        $this->isLog = true;
-        
-        $pendingRequest->getConnector()
-                ->middleware()
-                ->onRequest(
-                    fn(PendingRequest $request) => $this->formatRequestLog($request),
-                    'logger_request',
-                    PipeOrder::LAST
-                );
-
-        $pendingRequest->getConnector()
-                ->middleware()
-                ->onResponse(
-                    fn(Response $response) => $this->formatResponseLog($response),
-                    'logger_response',
-                    PipeOrder::FIRST
-                );
-    }
-
-    protected function formatRequestLog(PendingRequest $pendingRequest): ?PendingRequest
-    {
-
-        $requestClass = $pendingRequest->getRequest()::class;
-
-
-        $headers = array_map(function ($value) {
-            return implode(';', $value);
-        }, $pendingRequest->createPsrRequest()->getHeaders());
-
-        $cookies = $pendingRequest->config()->get('cookies');
-        
-        if($cookies instanceof \GuzzleHttp\Cookie\CookieJarInterface) {
-            $cookies = $cookies->toArray();
+        if (! $request instanceof HasLoggerInterface && ! $connector instanceof HasLoggerInterface) {
+            throw new HasLoggerException(sprintf('Your connector or request must implement %s to use the HasLogger plugin', HasLoggerInterface::class));
         }
-        
-        $this->getLogger()?->info("{$requestClass} Request:", [
-            'connector' => $pendingRequest->getConnector()::class,
-            'request' => $requestClass,
-            'method'  => $pendingRequest->getMethod(),
-            'uri'     => (string)$pendingRequest->getUri(),
-            'headers' => $headers,
-            'cookies' => $cookies,
-            'config' => $pendingRequest->config()->all(),
-            'body'    => (string)$pendingRequest->body(),
-        ]);
 
-        return $pendingRequest;
+        /** @var HasLoggerInterface $loggerManager */
+        $loggerManager = $request instanceof HasLoggerInterface
+        ? $request
+        : $connector;
+
+        $logger = $loggerManager->getLogger();
+        $messageFormatter = $this->getMessageFormatter();
+
+        /** @var GuzzleSender $sender */
+       $sender->addMiddleware(function (callable $handler) use ($logger, $messageFormatter) {
+            return function (RequestInterface $request, array $options) use ($handler, $logger, $messageFormatter) {
+                return $handler($request, $options)->then(
+                    function ($response) use ($logger, $request, $messageFormatter, $options) {
+
+                        $logger->debug($messageFormatter->format($request, $response));
+                        return $response;
+                    },
+                    function ($reason) use ($logger, $request, $messageFormatter, $options) {
+                        $response = $reason instanceof RequestException
+                            ? $reason->getResponse()
+                            : null;
+
+                        $logger->error($messageFormatter->format($request, $response, $reason));
+                        return \GuzzleHttp\Promise\Create::rejectionFor($reason);
+                    }
+                );
+            };
+        },'saloon.logger');
     }
 
-    protected function formatResponseLog(Response $response): ?Response
-    {
-        $requestClass = $response->getRequest()::class;
-
-        $headers = array_map(function ($value) {
-            return implode(';', $value);
-        }, $response->getPsrResponse()->getHeaders());
-
-        $this->getLogger()?->info("{$requestClass} Response:", [
-            'status'  => $response->status(),
-            'headers' => $headers,
-            'body'    => $response->body(),
-        ]);
-
-        return $response;
-    }
 }
