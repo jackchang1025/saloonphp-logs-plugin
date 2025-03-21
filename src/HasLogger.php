@@ -15,6 +15,18 @@ trait HasLogger
 
     protected ?MessageFormatter $messageFormatter = null;
 
+    protected bool $isLoaded = false;
+
+    public function isLoaded(): bool
+    {
+        return $this->isLoaded;
+    }
+
+    public function setLoaded(bool $loaded): void
+    {
+        $this->isLoaded = $loaded;
+    }
+
     public function withLogger(?LoggerInterface $logger = null): static
     {
         $this->logger = $logger;
@@ -60,6 +72,12 @@ trait HasLogger
 
         $logger = $loggerManager->getLogger();
         $messageFormatter = $this->getMessageFormatter();
+
+        if($loggerManager->isLoaded() || !$logger) {
+            return;
+        }
+
+        $loggerManager->setLoaded(true);
 
         /** @var GuzzleSender $sender */
        $sender->addMiddleware(function (callable $handler) use ($logger, $messageFormatter) {

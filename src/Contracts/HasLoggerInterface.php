@@ -14,4 +14,8 @@ interface HasLoggerInterface
     public function withMessageFormatter(MessageFormatter $messageFormatter): static;
 
     public function getMessageFormatter(): MessageFormatter;
+
+    public function isLoaded(): bool;
+
+    public function setLoaded(bool $loaded): void;
 }
