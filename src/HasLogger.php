@@ -41,7 +41,19 @@ trait HasLogger
 
     public function getMessageFormatter(): MessageFormatter
     {
-        return $this->messageFormatter ??= new MessageFormatter("\n{uri}\n{request}\n----------\n{response}\n");
+        return $this->messageFormatter ??= new MessageFormatter(
+            <<<FORMAT
+{method} {uri} HTTP/{version}
+{req_headers}
+
+{req_body}
+----------
+HTTP/{version} {code} {phrase}
+{res_headers}
+
+{res_body}
+FORMAT
+        );
     }
 
     public function withMessageFormatter(MessageFormatter $messageFormatter): static
